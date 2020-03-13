@@ -1,8 +1,14 @@
 ---
-title: "coronavirus"
-author: "enric"
-date: "12/3/2020"
-output: html_document
+title: "Mapa interactiu de l'expansió del cov-19"
+author: Enric Escorsa
+date: '2020-02-02'
+slug: coronavirus
+categories: []
+tags: []
+description: Desc
+hacker_news_id: ''
+lobsters_id: ''
+meta_img: /images/image.jpg
 ---
 
 ```{r setup, include=FALSE}
@@ -11,10 +17,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Evolució dels casos de coronavirus a temps real
 
-Prenc les dades de <https://www.ecdc.europa.eu/en/geographical-distribution-2019-ncov-cases>.
+Anem a estudiar l’evolució dels casos de coronavirus a temps real. Prenc les dades del European Centre for Disease Prevention and Control (<https://www.ecdc.europa.eu/en/geographical-distribution-2019-ncov-cases>) (usant el paquet per fer webscrapping de r, _rvest_)
 
-
-```{r cars}
+```{r, echo=TRUE, warning=F, message=F}
 library(rvest)
 #llegeixo lA PÀGINA
 paginaecdc <- read_html("https://www.ecdc.europa.eu/en/geographical-distribution-2019-ncov-cases")
@@ -24,29 +29,6 @@ taules <- html_nodes(paginaecdc, "table")
 
 head(taules)
 
-
-
-### mapejo
-
-```{r, echo=F, warning=F, message=F}
-library(tidyverse)
-library(leaflet)
-library(jsonlite)
-library(maptools)
-library(shiny)
-
-pal <- colorFactor(c("navy", "red"), domain = c(taula_coronaviruslocalitzat$`Casos confirmats`, taula_coronaviruslocalitzat$`Morts`))
-
-mapa <- leaflet(taula_coronaviruslocalitzat) %>% addTiles() %>%
-  addCircleMarkers(
-    radius = ~taula_coronaviruslocalitzat$`Casos confirmats`*0.0015,
-    color = ~pal(taula_coronaviruslocalitzat$`Morts`),
-    stroke = FALSE, fillOpacity = 0.4,
-    popup = ~as.character(taula_coronaviruslocalitzat$`Morts`),
-  )
-mapa
-``` 
-
 llista_de_taules <- paginaecdc %>%
         html_nodes("table") %>%
         .[1] %>%
@@ -54,17 +36,17 @@ llista_de_taules <- paginaecdc %>%
 
 #prenc la taula que m'interessa
 taula_coronavirus <-llista_de_taules[[1]]
+
 #canvio el noms de les columnes
 colnames(taula_coronavirus) <- c("Regio", "Pais", "Casos confirmats",
                             "Morts", "Casos confirmats els darrers 15 dies")
 ```
 
+### Geolocalitzo
 
-Geolocalitzo
+Ara geolocalitzo, generant la Longitud i latitud de cada país a la taula (desde _OpenStreetMaps_ amb el paquet _tmaptools_)
 
-```{r, echo=FALSE, warning=F, message=F}
-
-#GEOLOCALITZACIO
+```{r, echo=TRUE, warning=F, message=F}
 
 library(tmaptools)
 #amb la funcio geocode_OSM obtenim de open street maps les coordenades de la columna "Pais"
@@ -81,3 +63,29 @@ library(tidyverse)
 taula_coronaviruslocalitzat <- dplyr::left_join(taula_coronavirus, adcoordsnet, by = "Pais")
 
 ```
+
+
+### Mapejo
+
+Finalment mapejo en un mapa interactiu (amb _leaflet_), en el que pots navegar i fer zoom i clicar a cada país per veure dades que apareixen en popup.
+
+
+```{r, echo=TRUE, warning=F, message=F}
+library(tidyverse)
+library(leaflet)
+library(jsonlite)
+library(maptools)
+library(shiny)
+
+pal <- colorFactor(c("navy", "red"), domain = c(taula_coronaviruslocalitzat$`Morts`, taula_coronaviruslocalitzat$`Casos confirmats els darrers 15 dies`))
+
+
+mapa <- leaflet(taula_coronaviruslocalitzat) %>% addTiles() %>%
+  addCircleMarkers(
+    radius = ~taula_coronaviruslocalitzat$`Casos confirmats`*0.003,
+    color = ~pal(taula_coronaviruslocalitzat$`Morts`),
+    stroke = FALSE, fillOpacity = 0.35,
+    popup=paste("País:", taula_coronaviruslocalitzat$`Pais`, "<br>", "Casos:", taula_coronaviruslocalitzat$`Casos confirmats`, "<br>", "Casos confirmats els darrers 15 dies:", taula_coronaviruslocalitzat$`Casos confirmats els darrers 15 dies`, "<br>",  "Morts", taula_coronaviruslocalitzat$`Morts`, "<br>"))
+mapa
+``` 
+(mapa generat el primer cop a dia 12/03/2020)
