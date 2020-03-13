@@ -1,0 +1,83 @@
+---
+title: "coronavirus"
+author: "enric"
+date: "12/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Evolució dels casos de coronavirus a temps real
+
+Prenc les dades de <https://www.ecdc.europa.eu/en/geographical-distribution-2019-ncov-cases>.
+
+
+```{r cars}
+library(rvest)
+#llegeixo lA PÀGINA
+paginaecdc <- read_html("https://www.ecdc.europa.eu/en/geographical-distribution-2019-ncov-cases")
+
+#extrec taules
+taules <- html_nodes(paginaecdc, "table")
+
+head(taules)
+
+
+
+### mapejo
+
+```{r, echo=F, warning=F, message=F}
+library(tidyverse)
+library(leaflet)
+library(jsonlite)
+library(maptools)
+library(shiny)
+
+pal <- colorFactor(c("navy", "red"), domain = c(taula_coronaviruslocalitzat$`Casos confirmats`, taula_coronaviruslocalitzat$`Morts`))
+
+mapa <- leaflet(taula_coronaviruslocalitzat) %>% addTiles() %>%
+  addCircleMarkers(
+    radius = ~taula_coronaviruslocalitzat$`Casos confirmats`*0.0015,
+    color = ~pal(taula_coronaviruslocalitzat$`Morts`),
+    stroke = FALSE, fillOpacity = 0.4,
+    popup = ~as.character(taula_coronaviruslocalitzat$`Morts`),
+  )
+mapa
+``` 
+
+llista_de_taules <- paginaecdc %>%
+        html_nodes("table") %>%
+        .[1] %>%
+        html_table(fill = TRUE)
+
+#prenc la taula que m'interessa
+taula_coronavirus <-llista_de_taules[[1]]
+#canvio el noms de les columnes
+colnames(taula_coronavirus) <- c("Regio", "Pais", "Casos confirmats",
+                            "Morts", "Casos confirmats els darrers 15 dies")
+```
+
+
+Geolocalitzo
+
+```{r, echo=FALSE, warning=F, message=F}
+
+#GEOLOCALITZACIO
+
+library(tmaptools)
+#amb la funcio geocode_OSM obtenim de open street maps les coordenades de la columna "Pais"
+adcoords <- tmaptools::geocode_OSM(taula_coronavirus$"Pais")
+head(adcoords)
+
+#filtro només les columnes pais, lon i lat i canvio el nom de la columna dels paisos que es deia query a Country
+adcoordsnet <- dplyr::select(adcoords, query, lat, lon) %>% dplyr::rename(Pais = query)
+
+
+
+#finalment uso l'identificador Country per unir (merge) els dos dataframes (el dataframe original i el de coordenades) i afegir les columnes lon i lat al csv original
+library(tidyverse)
+taula_coronaviruslocalitzat <- dplyr::left_join(taula_coronavirus, adcoordsnet, by = "Pais")
+
+```
